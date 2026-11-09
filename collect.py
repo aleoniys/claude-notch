@@ -153,7 +153,7 @@ def _agents(session_dir):
         except Exception:
             continue
         log = meta.with_name(meta.name.replace(".meta.json", ".jsonl"))
-        tokens, first, last, seen = 0, 0, 0, set()
+        tokens, first, last, seen, used_model = 0, 0, 0, set(), ""
         if log.exists():
             for line in log.open("rb"):
                 if b'"timestamp"' not in line:
@@ -169,13 +169,14 @@ def _agents(session_dir):
                 u = msg.get("usage") if isinstance(msg, dict) else None
                 if u and (msg.get("id"), d.get("requestId")) not in seen:
                     seen.add((msg.get("id"), d.get("requestId")))
+                    used_model = msg.get("model") or used_model
                     tokens += _tokens(u) + (u.get("cache_read_input_tokens") or 0)
         mtime = log.stat().st_mtime if log.exists() else meta.stat().st_mtime
         running = not m.get("finished") and time.time() - mtime < 900
         out.append({
             "name": m.get("description") or m.get("agentType") or "agent",
             "type": m.get("agentType", ""),
-            "model": model_name(m.get("model")),
+            "model": model_name(used_model or m.get("model")),   # the model that actually answered
             "running": running,
             "tokens": tokens,
             "seconds": int((time.time() if running else last) - first) if first else 0,
