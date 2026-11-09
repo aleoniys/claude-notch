@@ -8,6 +8,12 @@
 $ErrorActionPreference = "Stop"
 $repo = "aleoniys/claude-notch"
 
+# Run a native program; its stderr warnings (pip prints some) must not abort the script.
+function Run($exe) {
+    $old = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+    try { & $exe @args 2>&1 | ForEach-Object { "$_" } } finally { $ErrorActionPreference = $old }
+}
+
 function Fail($msg) { Write-Host ""; Write-Host "  $msg" -ForegroundColor Red; Write-Host ""; throw $msg }
 
 # 1. A real Python 3.10+ (not the Microsoft Store stub).
@@ -15,8 +21,8 @@ $py = $null
 foreach ($cand in @("python", "py")) {
     $cmd = Get-Command $cand -ErrorAction SilentlyContinue
     if (-not $cmd -or $cmd.Source -like "*WindowsApps*") { continue }
-    $exe = & $cmd.Source -c "import sys; print(sys.executable if sys.version_info >= (3, 10) else '')" 2>$null
-    if ($LASTEXITCODE -eq 0 -and $exe) { $py = $exe.Trim(); break }
+    $exe = Run $cmd.Source -c "import sys; print(sys.executable if sys.version_info >= (3, 10) else '')" | Select-Object -Last 1
+    if ($LASTEXITCODE -eq 0 -and $exe -and (Test-Path $exe.Trim())) { $py = $exe.Trim(); break }
 }
 if (-not $py) { Fail "Python 3.10+ is needed: https://www.python.org/downloads/  (tick 'Add python.exe to PATH'), then run this again." }
 $pyw = Join-Path (Split-Path $py) "pythonw.exe"
@@ -43,10 +49,19 @@ if ($here -and (Test-Path (Join-Path $here "app.py"))) {
 
 # 3. Libraries.
 Write-Host "Installing libraries..."
-& $py -m pip install --user --disable-pip-version-check -q -r (Join-Path $dir "requirements.txt")
-if ($LASTEXITCODE -ne 0) { Fail "pip could not install the libraries (see above)." }
-& $py -c "import pystray, PIL, webview" 2>$null
-if ($LASTEXITCODE -ne 0) { Fail "The libraries did not import. Try: $py -m pip install -r `"$dir\requirements.txt`"" }
+$pipOut = Run $py -m pip install --user --disable-pip-version-check -q -r (Join-Path $dir "requirements.txt")
+if ($LASTEXITCODE -ne 0) { $pipOut | Select-Object -Last 15 | Write-Host; Fail "pip could not install the libraries (see above)." }
+$imp = Run $py -c "import pystray, PIL, webview"
+if ($LASTEXITCODE -ne 0) { $imp | Select-Object -Last 5 | Write-Host; Fail "The libraries did not import. Try: $py -m pip install -r `"$dir\requirements.txt`"" }
+
+# The panel is drawn by Microsoft Edge WebView2 (built into Windows 11; most Windows 10 PCs have it via Edge).
+$wv = "{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
+$hasWv = @("HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\$wv", "HKLM:\SOFTWARE\Microsoft\EdgeUpdate\Clients\$wv",
+           "HKCU:\Software\Microsoft\EdgeUpdate\Clients\$wv") | Where-Object { (Get-ItemProperty $_ -ErrorAction SilentlyContinue).pv }
+if (-not $hasWv) {
+    Write-Host "  Microsoft Edge WebView2 Runtime is missing. Install it, then start 'Claude Notch':" -ForegroundColor Yellow
+    Write-Host "  https://developer.microsoft.com/microsoft-edge/webview2/  (Evergreen Bootstrapper)" -ForegroundColor Yellow
+}
 
 # 4. Start menu shortcut.
 $app = Join-Path $dir "app.py"
