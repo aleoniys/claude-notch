@@ -50,7 +50,15 @@ The usage percentages are the ones Claude Code itself caches after it checks you
 - [Python 3.10+](https://www.python.org/downloads/). Tick "Add to PATH" during setup.
 - The Microsoft Edge WebView2 runtime. Windows 11 already has it.
 
-**Steps:**
+**One command, no git needed.** Paste into PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/aleoniys/claude-notch/main/install.ps1 | iex
+```
+
+This puts the files in `%LOCALAPPDATA%\claude-notch`.
+
+**Or with git:**
 
 ```powershell
 git clone https://github.com/aleoniys/claude-notch.git
@@ -58,10 +66,13 @@ cd claude-notch
 powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 
-The script:
-1. installs `pystray`, `Pillow` and `pywebview`;
-2. adds **Claude Notch** to the Start menu;
-3. starts the notch.
+Either way the installer:
+1. finds Python 3.10+, skipping the Microsoft Store stub;
+2. installs `pystray`, `Pillow` and `pywebview`;
+3. adds **Claude Notch** to the Start menu;
+4. starts the notch.
+
+Running it again is safe. It updates the files and keeps your `config.json` and `custom-icon.png`.
 
 To start it with Windows, right-click the tray icon and choose **Start with Windows**.
 

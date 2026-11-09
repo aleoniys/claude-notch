@@ -50,7 +50,15 @@
 - [Python 3.10+](https://www.python.org/downloads/). Під час встановлення постав галочку «Add to PATH».
 - Microsoft Edge WebView2. У Windows 11 він уже є.
 
-**Кроки:**
+**Одна команда, git не потрібен.** Встав у PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/aleoniys/claude-notch/main/install.ps1 | iex
+```
+
+Файли ляжуть у `%LOCALAPPDATA%\claude-notch`.
+
+**Або через git:**
 
 ```powershell
 git clone https://github.com/aleoniys/claude-notch.git
@@ -58,10 +66,13 @@ cd claude-notch
 powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 
-Скрипт:
-1. ставить `pystray`, `Pillow` і `pywebview`;
-2. додає **Claude Notch** у меню «Пуск»;
-3. запускає віджет.
+Установник в обох випадках:
+1. знаходить Python 3.10+, пропускаючи заглушку Microsoft Store;
+2. ставить `pystray`, `Pillow` і `pywebview`;
+3. додає **Claude Notch** у меню «Пуск»;
+4. запускає віджет.
+
+Запускати його повторно безпечно: він оновить файли, а твої `config.json` і `custom-icon.png` залишить.
 
 Щоб віджет стартував разом з Windows: правий клік по значку в треї → **Запускати з Windows**.
 
