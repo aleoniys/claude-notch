@@ -78,6 +78,10 @@
   .chips .none { background: none; color: var(--muted); padding: 1px 0; }
   .empty { color: var(--muted); font-size: 12px; }
   .foot { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 11px; padding-top: 12px; }
+  .stale-note { display: block; color: var(--warn); opacity: .8; margin-top: 2px; }
+  .stale-note:empty { display: none; }
+  body.stale #g5, body.stale #gW { opacity: .55; }
+  body.stale .pill .pct { color: var(--muted); }
   .foot button { border: 0; background: var(--card); color: var(--ink); padding: 5px 11px; border-radius: 999px; font: 600 11px var(--sans); cursor: pointer; border: 1px solid var(--line); }
   .foot button:hover { background: var(--accent-soft); color: var(--accent); }
 </style>
@@ -114,7 +118,7 @@
       <div class="card"><h2 data-i="installed"></h2><div id="installed"></div></div>
     </div>
     <div class="foot">
-      <span id="fToday"></span>
+      <span><span id="fToday"></span><span id="fStale" class="stale-note"></span></span>
       <button id="usageBtn" data-i="usage"></button>
     </div>
   </div>
@@ -195,8 +199,15 @@ function render(d) {
   if (s.status === "working") { nowEl.style.display = ""; nowEl.innerHTML = a.text ? `<em>${esc(a.tool || t("now"))}</em>${esc(a.text)}` : `<em>${esc(t("now"))}</em>${esc(t("thinkingLong"))}`; }
   else nowEl.style.display = "none";
 
-  if (L.five) { dial("g5", L.five.pct, L.five.pct + "%"); $("r5").textContent = until(L.five.resets, now); }
-  if (L.week) { dial("gW", L.week.pct, L.week.pct + "%"); $("rW").textContent = until(L.week.resets, now); }
+  // Claude Code refreshes the cached usage only now and then; say how old it is.
+  const age = L.fetched ? Math.max(0, Math.round(now - L.fetched)) : 0;
+  const stale = age > 600;
+  const pre = stale ? "~" : "";
+  document.body.classList.toggle("stale", stale);
+  $("fStale").textContent = stale ? t("updatedAgo", { t: fmtDur(age) }) : "";
+  $("pPct").textContent = five == null ? "—" : pre + five + "%";
+  if (L.five) { dial("g5", L.five.pct, pre + L.five.pct + "%"); $("r5").textContent = until(L.five.resets, now); }
+  if (L.week) { dial("gW", L.week.pct, pre + L.week.pct + "%"); $("rW").textContent = until(L.week.resets, now); }
   if (s.window) {
     const pc = Math.round((s.context / s.window) * 100);
     dial("gC", pc, pc + "%", pc >= 80 ? "var(--bad)" : "var(--accent)");
