@@ -32,7 +32,12 @@
   "trayAutostart": "Start with Windows",
   "trayQuit": "Quit",
   "trayTip": "5h: {a}% · week: {b}%",
-  "updatedAgo": "limits updated {t} ago"
+  "updatedAgo": "limits updated {t} ago",
+  "refresh": "Refresh",
+  "refreshing": "updating…",
+  "_name": "English",
+  "language": "Language",
+  "updateTo": "Update to {v}"
  },
  "uk": {
   "thinking": "думає",
@@ -67,7 +72,12 @@
   "trayAutostart": "Запускати з Windows",
   "trayQuit": "Вийти",
   "trayTip": "5 год: {a}% · тиждень: {b}%",
-  "updatedAgo": "ліміти оновлено {t} тому"
+  "updatedAgo": "ліміти оновлено {t} тому",
+  "refresh": "Оновити",
+  "refreshing": "оновлюю…",
+  "_name": "Українська",
+  "language": "Мова",
+  "updateTo": "Оновити до {v}"
  },
  "pl": {
   "thinking": "myśli",
@@ -102,7 +112,12 @@
   "trayAutostart": "Uruchamiaj z Windows",
   "trayQuit": "Zakończ",
   "trayTip": "5 godz.: {a}% · tydzień: {b}%",
-  "updatedAgo": "limity zaktualizowano {t} temu"
+  "updatedAgo": "limity zaktualizowano {t} temu",
+  "refresh": "Odśwież",
+  "refreshing": "aktualizuję…",
+  "_name": "Polski",
+  "language": "Język",
+  "updateTo": "Aktualizuj do {v}"
  },
  "de": {
   "thinking": "denkt",
@@ -137,7 +152,12 @@
   "trayAutostart": "Mit Windows starten",
   "trayQuit": "Beenden",
   "trayTip": "5 Std.: {a}% · Woche: {b}%",
-  "updatedAgo": "Limits vor {t} aktualisiert"
+  "updatedAgo": "Limits vor {t} aktualisiert",
+  "refresh": "Aktualisieren",
+  "refreshing": "aktualisiere…",
+  "_name": "Deutsch",
+  "language": "Sprache",
+  "updateTo": "Auf {v} aktualisieren"
  },
  "es": {
   "thinking": "pensando",
@@ -172,7 +192,12 @@
   "trayAutostart": "Iniciar con Windows",
   "trayQuit": "Salir",
   "trayTip": "5 h: {a}% · semana: {b}%",
-  "updatedAgo": "límites actualizados hace {t}"
+  "updatedAgo": "límites actualizados hace {t}",
+  "refresh": "Actualizar",
+  "refreshing": "actualizando…",
+  "_name": "Español",
+  "language": "Idioma",
+  "updateTo": "Actualizar a {v}"
  },
  "fr": {
   "thinking": "réfléchit",
@@ -207,7 +232,12 @@
   "trayAutostart": "Lancer avec Windows",
   "trayQuit": "Quitter",
   "trayTip": "5 h : {a} % · semaine : {b} %",
-  "updatedAgo": "limites mises à jour il y a {t}"
+  "updatedAgo": "limites mises à jour il y a {t}",
+  "refresh": "Actualiser",
+  "refreshing": "mise à jour…",
+  "_name": "Français",
+  "language": "Langue",
+  "updateTo": "Mettre à jour vers {v}"
  },
  "pt": {
   "thinking": "pensando",
@@ -242,6 +272,11 @@
   "trayAutostart": "Iniciar com o Windows",
   "trayQuit": "Sair",
   "trayTip": "5 h: {a}% · semana: {b}%",
-  "updatedAgo": "limites atualizados há {t}"
+  "updatedAgo": "limites atualizados há {t}",
+  "refresh": "Atualizar",
+  "refreshing": "atualizando…",
+  "_name": "Português",
+  "language": "Idioma",
+  "updateTo": "Atualizar para {v}"
  }
 }

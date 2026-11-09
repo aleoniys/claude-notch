@@ -3,3 +3,4 @@ __pycache__/
 notch.log
 config.json
 custom-icon.*
+.update-check

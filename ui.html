@@ -78,8 +78,14 @@
   .chips .none { background: none; color: var(--muted); padding: 1px 0; }
   .empty { color: var(--muted); font-size: 12px; }
   .foot { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 11px; padding-top: 12px; }
-  .stale-note { display: block; color: var(--warn); opacity: .8; margin-top: 2px; }
+  .foot-btns { display: flex; gap: 6px; }
+  .foot button.upd { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+  .foot button.lang { font-family: var(--mono); }
+  .stale-row { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
+  .stale-note { color: var(--warn); opacity: .85; }
   .stale-note:empty { display: none; }
+  .foot button.refresh { padding: 1px 8px; font-size: 12px; line-height: 18px; }
+  .foot button.refresh.spin-on { animation: spin .8s linear infinite; pointer-events: none; }
   body.stale #g5, body.stale #gW { opacity: .55; }
   body.stale .pill .pct { color: var(--muted); }
   .foot button { border: 0; background: var(--card); color: var(--ink); padding: 5px 11px; border-radius: 999px; font: 600 11px var(--sans); cursor: pointer; border: 1px solid var(--line); }
@@ -118,8 +124,13 @@
       <div class="card"><h2 data-i="installed"></h2><div id="installed"></div></div>
     </div>
     <div class="foot">
-      <span><span id="fToday"></span><span id="fStale" class="stale-note"></span></span>
-      <button id="usageBtn" data-i="usage"></button>
+      <span><span id="fToday"></span>
+        <span class="stale-row"><span id="fStale" class="stale-note"></span><button id="refreshBtn" class="refresh" title="">↻</button></span></span>
+      <span class="foot-btns">
+        <button id="updateBtn" class="upd" style="display:none"></button>
+        <button id="langBtn" class="lang"></button>
+        <button id="usageBtn" data-i="usage"></button>
+      </span>
     </div>
   </div>
 <script>
@@ -204,7 +215,8 @@ function render(d) {
   const stale = age > 600;
   const pre = stale ? "~" : "";
   document.body.classList.toggle("stale", stale);
-  $("fStale").textContent = stale ? t("updatedAgo", { t: fmtDur(age) }) : "";
+  if (!refreshing) $("fStale").textContent = stale ? t("updatedAgo", { t: fmtDur(age) }) : "";
+  usageAge = age;
   $("pPct").textContent = five == null ? "—" : pre + five + "%";
   if (L.five) { dial("g5", L.five.pct, pre + L.five.pct + "%"); $("r5").textContent = until(L.five.resets, now); }
   if (L.week) { dial("gW", L.week.pct, pre + L.week.pct + "%"); $("rW").textContent = until(L.week.resets, now); }
@@ -238,10 +250,23 @@ function panelHeight() {
   return Math.min($("panel").scrollHeight + 34, Math.round(window.screen.availHeight * 0.92));
 }
 
+let refreshing = false, usageAge = 0;
+async function refreshUsage() {
+  if (refreshing) return;
+  refreshing = true;
+  $("refreshBtn").classList.add("spin-on");
+  $("fStale").textContent = t("refreshing");
+  try { await window.pywebview.api.refresh_usage(); } catch (e) {}
+  refreshing = false;
+  $("refreshBtn").classList.remove("spin-on");
+  tick();
+}
+
 async function setOpen(v) {
   if (v === open) return;
   open = v;
   if (v) {
+    if (usageAge > 300) refreshUsage();   // older than 5 minutes: fetch fresh numbers on open
     notifyUntil = 0;                      // the user has seen it
     lastH = panelHeight();
     await window.pywebview.api.expand(lastH);
@@ -259,6 +284,43 @@ async function setOpen(v) {
 $("pill").addEventListener("mouseenter", () => setOpen(true));
 document.addEventListener("mouseenter", () => { pinned = false; });
 $("usageBtn").addEventListener("click", () => window.pywebview.api.open_url("https://claude.ai/settings/usage"));
+$("refreshBtn").addEventListener("click", refreshUsage);
+
+// Language: the 🌐 button cycles through the languages (also in the tray menu).
+let LANGS = [];
+$("langBtn").addEventListener("click", async () => {
+  if (!LANGS.length) LANGS = await window.pywebview.api.langs();
+  const i = LANGS.findIndex((l) => l[0] === S._lang);
+  await window.pywebview.api.set_lang(LANGS[(i + 1) % LANGS.length][0]);
+});
+async function reloadStrings() {
+  S = await window.pywebview.api.strings();
+  document.documentElement.lang = S._lang || "en";
+  document.querySelectorAll("[data-i]").forEach((el) => { el.textContent = t(el.dataset.i); });
+  $("refreshBtn").title = t("refresh");
+  $("langBtn").textContent = "🌐 " + (S._lang || "en").toUpperCase();
+  $("langBtn").title = t("language");
+  mode = ""; lastH = 0;
+  checkUpdate();
+  tick();
+}
+window.reloadStrings = reloadStrings;
+
+// Update from GitHub: shown only when a newer version exists; installs on click.
+let latest = null;
+async function checkUpdate() {
+  try { latest = (await window.pywebview.api.update_info()).latest; } catch (e) { latest = null; }
+  const b = $("updateBtn");
+  b.style.display = latest ? "" : "none";
+  if (latest) b.textContent = "↑ " + t("updateTo", { v: latest });
+}
+$("updateBtn").addEventListener("click", async () => {
+  const b = $("updateBtn");
+  b.textContent = t("refreshing"); b.disabled = true;
+  const ok = await window.pywebview.api.do_update();
+  if (!ok) { b.disabled = false; checkUpdate(); }
+});
+setInterval(checkUpdate, 600000);
 window.pinOpen = (v) => { pinned = v; setOpen(v); };
 window.autoClose = () => {
   if (pinned) return;
@@ -273,11 +335,9 @@ async function boot() {
   if (started || !window.pywebview || !window.pywebview.api || !window.pywebview.api.data) return;
   started = true;
   try {
-    S = await window.pywebview.api.strings();
-    document.documentElement.lang = S._lang || "en";
-    document.querySelectorAll("[data-i]").forEach((el) => { el.textContent = t(el.dataset.i); });
     const icon = await window.pywebview.api.icon();
     document.querySelectorAll("img.ico").forEach((img) => { img.src = icon; });
+    await reloadStrings();
   } catch (e) {}
   tick(); setInterval(tick, 3000);
 }

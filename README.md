@@ -29,7 +29,11 @@ The tray icon has a small menu: open the panel, hide the notch, start with Windo
 
 ## Privacy
 
-Everything is read from local files, and nothing is sent anywhere.
+Everything is read from local files. Nothing about you or your sessions is sent anywhere.
+
+The widget makes only two kinds of network request:
+- **The update check.** Once a day it fetches `version.json` from this repository. Turn it off with `"check_updates": false` in `config.json`.
+- **The ↻ button.** It runs `claude -p /usage`, a local Claude Code command. It does not call the model and does not use up your plan.
 
 | File | What is read |
 |---|---|
@@ -37,7 +41,7 @@ Everything is read from local files, and nothing is sent anywhere.
 | `~/.claude.json` | Only `cachedUsageUtilization`, `mcpServers` and `projects`. The login token in the same file is never read. |
 | `~/.claude/skills`, `~/.claude/plugins/installed_plugins.json`, `~/.claude/agents` | Installed skills, plugins and agents |
 
-The usage percentages are the ones Claude Code itself caches after it checks your plan. They update while Claude Code is in use.
+The usage percentages are the ones Claude Code itself caches after it checks your plan. If they are older than 10 minutes, the widget dims them and shows their age. Press **↻** to refresh them. The panel also refreshes them when you open it and they are older than 5 minutes.
 
 ## Install
 
@@ -67,11 +71,22 @@ To start it with Windows, right-click the tray icon and choose **Start with Wind
 
 The language follows Windows. Included: English, Українська, Polski, Deutsch, Español, Français, Português.
 
-To force a language, create `config.json` next to `app.py`:
+To change it, use either:
+- the **🌐** button at the bottom of the panel, which switches to the next language;
+- **Language** in the tray menu.
 
-```json
-{ "lang": "en" }
-```
+The choice is saved in `config.json`.
+
+## Updates
+
+Once a day the widget checks this repository for a newer version. When there is one, an **Update to x.y.z** button appears in the panel and in the tray menu.
+
+Nothing is installed until you click it. Then the widget:
+1. runs `git pull` if you installed with git, or downloads the ZIP otherwise;
+2. keeps your `config.json` and `custom-icon.png`;
+3. restarts.
+
+**Releasing a new version:** raise `version` in `version.json` and push to `main`.
 
 To add a language, copy the `en` block in `i18n.json`, translate it and use the language code as the key, then open a pull request.
 
@@ -87,6 +102,8 @@ Put a PNG named `custom-icon.png` next to `app.py` and restart. A square image w
 | `collect.py` | Reads the local Claude Code files |
 | `ui.html` | The pill and the panel |
 | `i18n.json` | Translations |
+| `update.py` | Update check and install |
+| `version.json` | Current version |
 
 To check what the widget reads, run `python collect.py`.
 

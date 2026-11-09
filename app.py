@@ -3,6 +3,8 @@ Reads only local Claude Code files. Start without a console: pythonw app.py"""
 import ctypes
 import json
 import os
+import shutil
+import subprocess
 import sys
 import threading
 import time
@@ -13,6 +15,7 @@ import pystray
 import webview
 from PIL import Image, ImageDraw
 
+import update
 from collect import collect
 
 HERE = Path(__file__).resolve().parent
@@ -48,9 +51,14 @@ I18N = json.loads((HERE / "i18n.json").read_text(encoding="utf-8"))
 LANG = _lang(I18N)
 T = {**I18N["en"], **I18N[LANG]}
 
-_mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "claude-notch-single")
-if ctypes.windll.kernel32.GetLastError() == 183:
-    sys.exit(0)
+_k32 = ctypes.windll.kernel32
+_k32.CreateMutexW.restype = ctypes.c_void_p
+_k32.WaitForSingleObject.argtypes = [ctypes.c_void_p, ctypes.c_uint]
+_mutex = _k32.CreateMutexW(None, False, "claude-notch-single")
+if _k32.GetLastError() == 183:
+    # After an update the old copy is still closing: wait for it, otherwise one copy is enough.
+    if not os.environ.get("NOTCH_RESTART") or _k32.WaitForSingleObject(_mutex, 15000) not in (0, 0x80):
+        sys.exit(0)
 
 from ctypes import wintypes as _wt  # noqa: E402
 
@@ -137,8 +145,34 @@ class Api:
         expanded = False
         place(int(w), PILL_H)
 
+    def refresh_usage(self):
+        """Ask Claude Code for fresh plan usage. /usage is a local command: no model call, no usage spent."""
+        exe = shutil.which("claude")
+        if not exe:
+            return False
+        try:
+            subprocess.run([exe, "-p", "/usage"], capture_output=True, timeout=60, cwd=str(Path.home()),
+                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        except Exception as e:
+            log(f"refresh: {e!r}")
+            return False
+        _last["at"] = 0.0
+        return True
+
     def strings(self):
         return {**T, "_lang": LANG}
+
+    def langs(self):
+        return [[code, I18N[code].get("_name", code)] for code in I18N]
+
+    def set_lang(self, code):
+        set_lang(code)
+
+    def update_info(self):
+        return {"current": update.local_version(), "latest": _update["latest"]}
+
+    def do_update(self):
+        return run_update()
 
     def icon(self):
         return ICON.name
@@ -232,22 +266,82 @@ def watch_cursor():
             log(f"watch: {e!r}")
 
 
+_update = {"latest": None, "busy": False}
+
+
+def set_lang(code):
+    """Switch language now and remember it in config.json."""
+    global LANG, T
+    if code not in I18N:
+        return
+    cfg = _config()
+    cfg["lang"] = code
+    CONFIG.write_text(json.dumps(cfg, ensure_ascii=False, indent=1), encoding="utf-8")
+    LANG, T = code, {**I18N["en"], **I18N[code]}
+    if tray:
+        tray.menu = build_menu()
+        tray.update_menu()
+    window.evaluate_js("reloadStrings()")
+
+
+def run_update():
+    """Only on the user's click: update the files, then start the new version."""
+    if _update["busy"]:
+        return False
+    _update["busy"] = True
+    try:
+        update.apply()
+    except Exception as e:
+        log(f"update: {e!r}")
+        _update["busy"] = False
+        return False
+    subprocess.Popen([str(PYW), str(HERE / "app.py")], cwd=str(HERE), env={**os.environ, "NOTCH_RESTART": "1"})
+    if tray:
+        tray.visible = False
+        tray.stop()
+    window.destroy()
+    return True
+
+
+def check_updates():
+    if _config().get("check_updates", True) is False:
+        return
+    while True:
+        latest = update.check()
+        if latest and latest != _update["latest"]:
+            _update["latest"] = latest
+            if tray:
+                tray.menu = build_menu()
+                tray.update_menu()
+        time.sleep(6 * 3600)
+
+
+def build_menu():
+    def lang_item(code):
+        return pystray.MenuItem(I18N[code].get("_name", code), lambda i, it: set_lang(code),
+                                checked=lambda it: LANG == code, radio=True)
+
+    items = [
+        pystray.MenuItem(T["trayOpen"], pin_panel, default=True),
+        pystray.MenuItem(T["trayToggle"], toggle_notch),
+        pystray.MenuItem(T["trayAutostart"], toggle_autostart, checked=lambda i: STARTUP.exists()),
+        pystray.MenuItem(T["language"], pystray.Menu(*[lang_item(c) for c in I18N])),
+        pystray.MenuItem(T["usage"], lambda i, it: webbrowser.open("https://claude.ai/settings/usage")),
+    ]
+    if _update["latest"]:
+        items.append(pystray.MenuItem(T["updateTo"].format(v=_update["latest"]),
+                                      lambda i, it: threading.Thread(target=run_update, daemon=True).start()))
+    items += [pystray.Menu.SEPARATOR, pystray.MenuItem(T["trayQuit"], quit_all)]
+    return pystray.Menu(*items)
+
+
 def on_start():
     global tray
-    tray = pystray.Icon(
-        "claude-notch", tray_image(None), "Claude",
-        menu=pystray.Menu(
-            pystray.MenuItem(T["trayOpen"], pin_panel, default=True),
-            pystray.MenuItem(T["trayToggle"], toggle_notch),
-            pystray.MenuItem(T["trayAutostart"], toggle_autostart, checked=lambda i: STARTUP.exists()),
-            pystray.MenuItem(T["usage"], lambda i, it: webbrowser.open("https://claude.ai/settings/usage")),
-            pystray.Menu.SEPARATOR,
-            pystray.MenuItem(T["trayQuit"], quit_all),
-        ),
-    )
+    tray = pystray.Icon("claude-notch", tray_image(None), "Claude", menu=build_menu())
     tray.run_detached()
     threading.Thread(target=tray_loop, daemon=True).start()
     threading.Thread(target=watch_cursor, daemon=True).start()
+    threading.Thread(target=check_updates, daemon=True).start()
     time.sleep(0.8)
     try:
         style()
