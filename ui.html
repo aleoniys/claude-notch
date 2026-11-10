@@ -217,6 +217,8 @@ function render(d) {
   document.body.classList.toggle("stale", stale);
   if (!refreshing) $("fStale").textContent = stale ? t("updatedAgo", { t: fmtDur(age) }) : "";
   usageAge = age;
+  // Old numbers refresh by themselves: right after start, then at most every 10 minutes.
+  if (age > 300 && Date.now() - lastAutoRefresh > 600000) { lastAutoRefresh = Date.now(); refreshUsage(); }
   $("pPct").textContent = five == null ? "—" : pre + five + "%";
   if (L.five) { dial("g5", L.five.pct, pre + L.five.pct + "%"); $("r5").textContent = until(L.five.resets, now); }
   if (L.week) { dial("gW", L.week.pct, pre + L.week.pct + "%"); $("rW").textContent = until(L.week.resets, now); }
@@ -250,7 +252,7 @@ function panelHeight() {
   return Math.min($("panel").scrollHeight + 34, Math.round(window.screen.availHeight * 0.92));
 }
 
-let refreshing = false, usageAge = 0;
+let refreshing = false, usageAge = 0, lastAutoRefresh = 0;
 async function refreshUsage() {
   if (refreshing) return;
   refreshing = true;

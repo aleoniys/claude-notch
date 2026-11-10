@@ -95,10 +95,11 @@ def _tail_entries(path, size=600_000):
     with path.open("rb") as fh:
         fh.seek(0, 2)
         end = fh.tell()
-        fh.seek(max(0, end - size))
+        start = max(0, end - size)
+        fh.seek(start)
         data = fh.read()
     out = []
-    for line in data.splitlines()[1:]:
+    for line in data.splitlines()[1 if start else 0:]:   # the first line is partial only when we started mid-file
         try:
             out.append(json.loads(line))
         except Exception:
@@ -252,20 +253,27 @@ def collect():
                 break
         window = 1_000_000 if ctx > 200_000 or "[1m]" in str(model) else 200_000
         idle = time.time() - active.stat().st_mtime
-        # The turn is over when the last main-thread message is Claude's with stop_reason end_turn.
-        turn_done = False
+        # The turn is over when the last real main-thread message is Claude's with stop_reason end_turn.
+        # Opening or resuming a session writes title/mode records and local-command output; they are not work,
+        # so the age of the last real message decides, not the file's modified time.
+        turn_done, last_ts = False, 0.0
         for d in reversed(entries):
-            if d.get("isSidechain") or d.get("type") not in ("assistant", "user"):
+            if d.get("isSidechain") or d.get("isMeta") or d.get("type") not in ("assistant", "user"):
                 continue
             m = d.get("message") or {}
-            turn_done = d.get("type") == "assistant" and isinstance(m, dict) and m.get("stop_reason") == "end_turn"
+            c = m.get("content") if isinstance(m, dict) else None
+            if isinstance(c, str) and c.lstrip().startswith(("<local-command", "<command-")):
+                continue
+            turn_done = d.get("type") == "assistant" and m.get("stop_reason") == "end_turn"
+            last_ts = _ts(d.get("timestamp", ""))
             break
+        since = time.time() - last_ts if last_ts else 1e9   # no real message yet: nothing is running
         if idle >= 1800:
             status = "sleeping"
-        elif turn_done:
+        elif turn_done or since >= 300:
             status = "waiting"
         else:
-            status = "working" if idle < 300 else "waiting"
+            status = "working"
         cwd_path = Path(cwd) if cwd else None
         session = {
             "project": cwd_path.name if cwd_path else active.parent.name,
